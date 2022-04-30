@@ -66,57 +66,33 @@ pub(crate) mod arm {
         any(target_arch = "aarch64", target_arch = "arm")
     ))]
     pub fn setup() {
-        use libc::c_ulong;
-
-        // XXX: The `libc` crate doesn't provide `libc::getauxval` consistently
-        // across all Android/Linux targets, e.g. musl.
-        extern "C" {
-            fn getauxval(type_: c_ulong) -> c_ulong;
-        }
-
-        const AT_HWCAP: c_ulong = 16;
-
+        #[cfg(target_arch = "arm")]
+        use crate::cpu_features::cpuinfo_arm::{ArmInfo, GetArmInfo};
         #[cfg(target_arch = "aarch64")]
-        const HWCAP_NEON: c_ulong = 1 << 1;
+        use crate::cpu_features::cpuinfo_aarch64::{Aarch64Info, GetAarch64Info};
 
         #[cfg(target_arch = "arm")]
-        const HWCAP_NEON: c_ulong = 1 << 12;
-
-        let caps = unsafe { getauxval(AT_HWCAP) };
-
-        // We assume NEON is available on AARCH64 because it is a required
-        // feature.
+        let caps: ArmInfo = unsafe { GetArmInfo() };
         #[cfg(target_arch = "aarch64")]
-        debug_assert!(caps & HWCAP_NEON == HWCAP_NEON);
+        let caps: Aarch64Info = unsafe { GetAarch64Info() };
+
+        #[cfg(target_arch = "arm")]
+        let is_neon_available: bool = if caps.features.neon() == 1 { true } else { false };
+        #[cfg(target_arch = "aarch64")]
+        let is_neon_available: bool = true;
 
         // OpenSSL and BoringSSL don't enable any other features if NEON isn't
         // available.
-        if caps & HWCAP_NEON == HWCAP_NEON {
+        if is_neon_available {
             let mut features = NEON.mask;
 
-            #[cfg(target_arch = "aarch64")]
-            const OFFSET: c_ulong = 3;
-
-            #[cfg(target_arch = "arm")]
-            const OFFSET: c_ulong = 0;
-
-            #[cfg(target_arch = "arm")]
-            let caps = {
-                const AT_HWCAP2: c_ulong = 26;
-                unsafe { getauxval(AT_HWCAP2) }
-            };
-
-            const HWCAP_AES: c_ulong = 1 << 0 + OFFSET;
-            const HWCAP_PMULL: c_ulong = 1 << 1 + OFFSET;
-            const HWCAP_SHA2: c_ulong = 1 << 3 + OFFSET;
-
-            if caps & HWCAP_AES == HWCAP_AES {
+            if caps.features.aes() == 1 {
                 features |= AES.mask;
             }
-            if caps & HWCAP_PMULL == HWCAP_PMULL {
+            if caps.features.pmull() == 1 {
                 features |= PMULL.mask;
             }
-            if caps & HWCAP_SHA2 == HWCAP_SHA2 {
+            if caps.features.sha2() == 1 {
                 features |= SHA256.mask;
             }
 

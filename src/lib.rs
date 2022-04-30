@@ -102,6 +102,7 @@ pub mod constant_time;
 pub mod io;
 
 mod cpu;
+mod cpu_features;
 pub mod digest;
 mod ec;
 mod endian;

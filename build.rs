@@ -251,6 +251,7 @@ fn ring_build_rs_main() {
     let out_dir = env::var("OUT_DIR").unwrap();
     let out_dir = PathBuf::from(out_dir);
 
+    let triplet: &str = &env::var("TARGET").unwrap();
     let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     let env = env::var("CARGO_CFG_TARGET_ENV").unwrap();
@@ -264,6 +265,20 @@ fn ring_build_rs_main() {
 
     // Published builds are always release builds.
     let is_debug = is_git && env::var("DEBUG").unwrap() != "false";
+
+    if os == "android" && (arch == ARM || arch == AARCH64) {
+        let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+        println!("cargo:rustc-link-lib=static=cpu_features");
+        println!("cargo:rustc-link-search={}/../cpu_features/build-android-{}",
+            manifest_dir,
+            match triplet {
+                "arm-linux-androideabi" => "armv5",
+                "armv7-linux-androideabi" => "armv7",
+                "aarch64-linux-android" => "aarch64",
+                e => panic!("unsupported triplet: {}", e)
+            }
+        );
+    }
 
     let target = Target {
         arch,
